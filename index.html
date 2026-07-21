@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>HTMLセーバー</title>
+<meta name="description" content="URLを入力すると、そのページのHTMLファイルだけをダウンロードします。">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="theme-color" content="#0B1B26">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="HTMLセーバー">
+<style>
+  :root {
+    --bg: #0B1B26;
+    --bg2: #07141E;
+    --panel: #102A38;
+    --line: #1E3D4E;
+    --text: #E8F1F2;
+    --muted: #7FA3AE;
+    --amber: #FFB74D;
+    --cyan: #5EDCCD;
+    --err: #FF8A80;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", sans-serif;
+    background: linear-gradient(180deg, var(--bg) 0%, var(--bg2) 100%);
+    color: var(--text);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: max(env(safe-area-inset-top), 20px) 20px max(env(safe-area-inset-bottom), 20px);
+    -webkit-font-smoothing: antialiased;
+  }
+  main { width: 100%; max-width: 480px; margin-top: 8vh; }
+
+  .mark {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-size: 14px;
+    letter-spacing: .35em;
+    color: var(--cyan);
+    margin-bottom: 10px;
+  }
+  h1 {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: .02em;
+    margin-bottom: 6px;
+  }
+  h1 .ext {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    color: var(--amber);
+    font-weight: 600;
+  }
+  .lead {
+    color: var(--muted);
+    font-size: 14px;
+    line-height: 1.7;
+    margin-bottom: 32px;
+  }
+
+  .field { margin-bottom: 14px; }
+  label {
+    display: block;
+    font-size: 12px;
+    letter-spacing: .12em;
+    color: var(--muted);
+    margin-bottom: 8px;
+  }
+  input[type="url"] {
+    width: 100%;
+    padding: 15px 16px;
+    font-size: 16px;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    color: var(--text);
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    outline: none;
+    transition: border-color .15s;
+  }
+  input[type="url"]::placeholder { color: #3E6272; }
+  input[type="url"]:focus { border-color: var(--cyan); }
+
+  button.save {
+    width: 100%;
+    padding: 16px;
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: .04em;
+    color: #17130A;
+    background: var(--amber);
+    border: none;
+    border-radius: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    transition: transform .08s, filter .15s;
+  }
+  button.save:active { transform: scale(.985); }
+  button.save:disabled { filter: grayscale(.6) brightness(.75); cursor: wait; }
+  button.save .glyph {
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    font-weight: 600;
+  }
+  button.save:focus-visible,
+  input:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+
+  .status {
+    margin-top: 18px;
+    min-height: 48px;
+    padding: 13px 15px;
+    border-radius: 10px;
+    font-size: 13.5px;
+    line-height: 1.6;
+    display: none;
+  }
+  .status.show { display: block; }
+  .status.info { background: rgba(94,220,205,.08); border: 1px solid rgba(94,220,205,.3); color: var(--cyan); }
+  .status.ok   { background: rgba(255,183,77,.08); border: 1px solid rgba(255,183,77,.35); color: var(--amber); }
+  .status.err  { background: rgba(255,138,128,.08); border: 1px solid rgba(255,138,128,.35); color: var(--err); }
+
+  footer {
+    margin-top: auto;
+    padding-top: 40px;
+    font-size: 11.5px;
+    color: #3E6272;
+    text-align: center;
+    line-height: 1.8;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    button.save { transition: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <div class="mark">&lt; ↓ &gt;</div>
+  <h1>HTMLセーバー<span class="ext"> .html</span></h1>
+  <p class="lead">URLを入力すると、そのページのHTMLファイルだけを保存します。画像やCSSは含みません。</p>
+
+  <div class="field">
+    <label for="url">ページのURL</label>
+    <input type="url" id="url" placeholder="https://example.com/" inputmode="url" autocomplete="off" autocapitalize="off" spellcheck="false" enterkeyhint="go">
+  </div>
+
+  <button class="save" id="btn">
+    <span class="glyph">&lt;↓&gt;</span> HTMLを保存
+  </button>
+
+  <div class="status" id="status" role="status" aria-live="polite"></div>
+</main>
+
+<footer>
+  ブラウザのメニューから「ホーム画面に追加」でアプリとして使えます
+</footer>
+
+<script>
+const input  = document.getElementById('url');
+const btn    = document.getElementById('btn');
+const status = document.getElementById('status');
+
+function show(kind, msg) {
+  status.className = 'status show ' + kind;
+  status.textContent = msg;
+}
+
+function normalize(raw) {
+  raw = raw.trim();
+  if (!raw) return null;
+  if (!/^https?:\/\//i.test(raw)) raw = 'https://' + raw;
+  try { return new URL(raw); } catch { return null; }
+}
+
+function filenameFor(u) {
+  let base = u.hostname.replace(/^www\./, '');
+  const last = u.pathname.split('/').filter(Boolean).pop();
+  if (last) {
+    base += '_' + last.replace(/\.[a-z0-9]+$/i, '');
+  }
+  base = base.replace(/[^\w.\-]+/g, '_').slice(0, 80);
+  return (base || 'page') + '.html';
+}
+
+async function fetchHtml(u) {
+  const targets = [
+    u.href,
+    'https://api.allorigins.win/raw?url=' + encodeURIComponent(u.href),
+    'https://corsproxy.io/?url=' + encodeURIComponent(u.href),
+  ];
+  let lastErr = null;
+  for (let i = 0; i < targets.length; i++) {
+    try {
+      if (i === 1) show('info', '直接取得できなかったため、中継サーバー経由で再試行しています…');
+      const res = await fetch(targets[i], { redirect: 'follow' });
+      if (!res.ok) { lastErr = new Error('HTTP ' + res.status); continue; }
+      const text = await res.text();
+      if (text.length === 0) { lastErr = new Error('空の応答'); continue; }
+      return text;
+    } catch (e) {
+      lastErr = e;
+    }
+  }
+  throw lastErr || new Error('取得できませんでした');
+}
+
+async function save() {
+  const u = normalize(input.value);
+  if (!u) {
+    show('err', 'URLの形式が正しくありません。例: https://example.com/');
+    return;
+  }
+  btn.disabled = true;
+  show('info', u.hostname + ' からHTMLを取得しています…');
+  try {
+    const html = await fetchHtml(u);
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
+    const name = filenameFor(u);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    show('ok', '保存しました: ' + name + '（' + Math.round(blob.size / 1024) + ' KB）');
+  } catch (e) {
+    show('err', '取得に失敗しました。URLを確認するか、時間をおいて再試行してください。（' + e.message + '）');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+btn.addEventListener('click', save);
+input.addEventListener('keydown', e => { if (e.key === 'Enter') save(); });
+
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+</script>
+</body>
+</html>
